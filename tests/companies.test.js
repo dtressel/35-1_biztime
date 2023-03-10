@@ -5,7 +5,7 @@ const app = require("../app");
 const db = require('../db');
 
 let testCompanies;
-let testInvoices
+let testInvoices;
 
 beforeEach(async () => {
   console.log('Before Each');
@@ -25,7 +25,7 @@ beforeEach(async () => {
              ('ibm', 400, false, null)
       RETURNING id, comp_code, amt, paid, add_date, paid_date`
   );
-  testInvoices = result.rows;
+  testInvoices = result2.rows;
 })
 
 afterEach(async () => {
