@@ -1,4 +1,5 @@
 const express = require('express');
+
 const router = new express.Router();
 const db = require('../db');
 const ExpressError = require('../expressError');
@@ -40,20 +41,20 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { code, amt } = req.body;
-    if (!(typeof code === 'string') || (isNaN(amt))) {
+    const { comp_code, amt } = req.body;
+    if (!(typeof comp_code === 'string') || (isNaN(amt))) {
       throw new ExpressError(`Request data is not in the proper format.`, 400);
     }
     const query = await db.query(
       `INSERT INTO invoices (comp_code, amt)
         VALUES ($1, $2)
         RETURNING id, comp_code, amt, paid, add_date, paid_date`,
-      [code, amt]
+      [comp_code, amt]
     );
     if (!query.rows[0]) {
       throw new ExpressError('Error creating new invoice.', 500);
     }
-    res.json({invoice: query.rows[0]});
+    res.status(201).json({invoice: query.rows[0]});
   }
   catch(err) {
     next(err);
@@ -63,13 +64,41 @@ router.post('/', async (req, res, next) => {
 router.patch('/:id', async (req, res, next) => {
   try {
     const id = req.params.id;
-    const { amt: newAmt } = req.body;
-    const query = await db.query(
-      `UPDATE invoices SET amt=$1
-        WHERE id = $2
-        RETURNING id, comp_code, amt, paid, add_date, paid_date`,
-      [newAmt, id]
-    );
+    const { amt, paid } = req.body;
+    let query;
+    if (paid !== undefined) {
+      let paid_date = null;
+      if (paid === true) {
+        paid_date = new Date(Date.now());
+      }
+      else if (paid !== false) {
+        throw new ExpressError(`Paid value must be true or false`, 404);
+      }
+      if (amt === undefined) {
+        query = await db.query(
+          `UPDATE invoices SET paid=$1, paid_date=$2
+            WHERE id = $3
+            RETURNING id, comp_code, amt, paid, add_date, paid_date`,
+          [paid, paid_date, id]
+        );
+      }
+      else {
+        query = await db.query(
+          `UPDATE invoices SET amt=$1, paid=$2, paid_date=$3
+            WHERE id = $4
+            RETURNING id, comp_code, amt, paid, add_date, paid_date`,
+          [amt, paid, paid_date, id]
+        );
+      }
+    } 
+    else {
+      query = await db.query(
+        `UPDATE invoices SET amt=$1
+          WHERE id = $2
+          RETURNING id, comp_code, amt, paid, add_date, paid_date`,
+        [amt, id]
+      );
+    }
     if (!query.rows[0]) {
       throw new ExpressError(`Invoice id '${id}' could not be found`, 404);
     }
@@ -91,7 +120,7 @@ router.delete('/:id', async (req, res, next) => {
     if (!query.rows[0]) {
       throw new ExpressError(`Invoice id '${id}' could not be found`, 404);
     }
-    res.json({message: "Deleted"});
+    res.json({status: "deleted"});
   }
   catch(err) {
     next(err);
